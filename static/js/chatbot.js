@@ -5,31 +5,69 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatInput = document.querySelector(".chat-input textarea");
     const sendChatBtn = document.querySelector(".chat-input span");
 
-    // 1. SOLIS: Izveidot mainīgo sarunas vēstures glabāšanai.
+    // 1. SOLIS: Izveidot mainīgo sarunas vēstures glabāšanai
+    const conversationHistory = [];
 
     const createChatLi = (message, className) => {
         const chatLi = document.createElement("li");
         chatLi.classList.add("chat", className);
-        let chatContent = className === "outgoing" ? `<p></p>` : `<span class="material-symbols-outlined">smart_toy</span><p></p>`;
+        let chatContent = className === "outgoing"
+            ? `<p></p>`
+            : `<span class="material-symbols-outlined">smart_toy</span><p></p>`;
         chatLi.innerHTML = chatContent;
         chatLi.querySelector("p").textContent = message;
         return chatLi;
     }
 
-    // 2. SOLIS: Implementēt funkciju, kas sazinās ar serveri.
+    // 2. SOLIS: Implementēt funkciju, kas sazinās ar serveri
     const generateResponse = (incomingChatLi) => {
-        const API_URL = "/chatbot";
+        const API_URL = "http://localhost:8000/api/chat";
         const messageElement = incomingChatLi.querySelector("p");
 
-        // TODO: Sagatavot pieprasījuma opcijas (request options)
-        // Izveidojiet JSON virknes objektu, kas satur gan pēdējo lietotāja ziņu, gan visu iepriekšējo sarunas vēsturi.
+        // Sagatavot pieprasījuma opcijas
         const requestOptions = {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                messages: conversationHistory  // Nosūtām visu vēsturi
+            })
         };
 
-        // TODO: Izsaukt `fetch()` ar izveidotajām opcijām.
-        // Pēc atbildes saņemšanas:
-        // 1. Atjaunojiet `messageElement` saturu ar saņemto atbildi.
-        // 2. Pievienojiet bota atbildi mainīgajā sarunas vēstures glabāšanai.
+        // Izsaukt fetch() ar izveidotajām opcijām
+        fetch(API_URL, requestOptions)
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`Server returned ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                // 1. Atjaunot messageElement saturu ar saņemto atbildi
+                const botReply = data.response || data.reply || "No response from server";
+                messageElement.textContent = botReply;
+
+                // 2. Pievienot bota atbildi sarunas vēsturei
+                conversationHistory.push({
+                    role: "assistant",
+                    content: botReply
+                });
+            })
+            .catch(err => {
+                console.error("Fetch error:", err);
+                messageElement.textContent = "Kļūda sazinoties ar serveri.";
+                
+                // Tikai pievienojam kļūdas ierakstu vēsturē, ja vēlaties to reģistrēt
+                conversationHistory.push({
+                    role: "assistant",
+                    content: "Kļūda sazinoties ar serveri."
+                });
+            })
+            .finally(() => {
+                // Pārlokot uz jaunāko ziņu
+                chatbox.scrollTo(0, chatbox.scrollHeight);
+            });
     }
 
     const handleChat = () => {
@@ -42,8 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
         chatbox.appendChild(createChatLi(userMessage, "outgoing"));
         chatbox.scrollTo(0, chatbox.scrollHeight);
         
-        // 3. SOLIS: Pievienot lietotāja ziņu mainīgajā sarunas vēstures glabāšanai
-        // TODO: Pievienojiet ziņu masīvam pareizajā formātā (kā objektu ar "role" un "content").
+        // 3. SOLIS: Pievienot lietotāja ziņu sarunas vēsturei
+        conversationHistory.push({
+            role: "user",
+            content: userMessage
+        });
         
         setTimeout(() => {
             const incomingChatLi = createChatLi("Thinking...", "incoming");
@@ -68,4 +109,4 @@ document.addEventListener('DOMContentLoaded', () => {
     sendChatBtn.addEventListener("click", handleChat);
     closeBtn.addEventListener("click", () => document.body.classList.remove("show-chatbot"));
     chatbotToggler.addEventListener("click", () => document.body.classList.toggle("show-chatbot"));
-});
+});  
